@@ -585,9 +585,11 @@ document.getElementById("importInput").onchange=e=>{
     if(o.data) data=o.data;
     if(o.settings) settings=Object.assign(settings,o.settings);
     saveData(); saveSettings();
+    await initCloud();   // 导入后自动按新配置接上云端
     // 已登录则把导入的数据推上云
     if(sb&&sbUser){ for(const d in data) for(const m of data[d]){ m.date=m.date||d; enqueue({type:"upsert",meal:m}); } await syncAll(); }
-    renderAll(); updateSyncStatus(); alert("导入成功！");
+    openSettingsForm();
+    alert("导入成功！配置已带过来，接下来在②云同步里用同一账号登录即可。");
   }catch(err){alert("文件格式不对："+err.message);}};
   r.readAsText(f);
 };
