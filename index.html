@@ -392,6 +392,21 @@ async function pushConfig(){
       model:settings.model, goal:settings.goal, updated_at:new Date().toISOString()});
   }catch(e){ console.warn("配置上传失败",e); }
 }
+/* 照片上传到 Storage（清晰原图），返回公开链接 */
+async function uploadPhoto(id,dataUrl){
+  if(!sb||!sbUser) return null;
+  try{
+    const blob=await (await fetch(dataUrl)).blob();
+    const path=`${sbUser.id}/${id}.jpg`;
+    const {error}=await sb.storage.from("photos").upload(path,blob,{contentType:"image/jpeg",upsert:true});
+    if(error){ console.warn("照片上传失败",error); return null; }
+    return sb.storage.from("photos").getPublicUrl(path).data.publicUrl;
+  }catch(e){ console.warn(e); return null; }
+}
+async function removePhoto(id){
+  if(!sb||!sbUser) return;
+  try{ await sb.storage.from("photos").remove([`${sbUser.id}/${id}.jpg`]); }catch(e){}
+}
 async function syncAll(){
   if(!sb||!sbUser||syncing) return;
   syncing=true; updateSyncStatus(true);
@@ -506,7 +521,7 @@ function deleteMeal(id){
   if(!confirm("删除这一餐？"))return;
   data[selDate]=(data[selDate]||[]).filter(m=>m.id!==id);
   if(!data[selDate].length) delete data[selDate];
-  saveData(); enqueue({type:"delete",id}); flushQueue();
+  saveData(); enqueue({type:"delete",id}); flushQueue(); removePhoto(id);
   renderAll(); updateSyncStatus();
 }
 function editMealCalories(id){
@@ -540,7 +555,7 @@ document.getElementById("detailDel").onclick=()=>{
   if(!confirm("删除这一餐？"))return;
   data[selDate]=(data[selDate]||[]).filter(m=>m.id!==id);
   if(!data[selDate].length) delete data[selDate];
-  saveData(); enqueue({type:"delete",id}); flushQueue();
+  saveData(); enqueue({type:"delete",id}); flushQueue(); removePhoto(id);
   closeModal(document.getElementById("detailModal"));
   renderAll(); updateSyncStatus();
 };
@@ -652,7 +667,7 @@ function flash(msg){
 }
 
 /* ===================== 添加一餐 ===================== */
-let pendingPhoto=null, apiImageB64=null, apiImageType=null, lastResult=null;
+let pendingPhoto=null, fullPhoto=null, apiImageB64=null, apiImageType=null, lastResult=null;
 document.getElementById("addBtn").onclick=()=>{resetAddForm();openModal("addModal");};
 function resetAddForm(){
   document.getElementById("mealText").value="";
@@ -661,7 +676,7 @@ function resetAddForm(){
   document.getElementById("saveMealBtn").style.display="none";
   document.getElementById("addErr").style.display="none";
   const b=document.getElementById("estimateBtn"); b.disabled=false; b.textContent="让 AI 估算卡路里";
-  pendingPhoto=null;apiImageB64=null;apiImageType=null;lastResult=null;
+  pendingPhoto=null;fullPhoto=null;apiImageB64=null;apiImageType=null;lastResult=null;
 }
 function handleImage(file){
   if(!file)return;
@@ -669,9 +684,10 @@ function handleImage(file){
   r.onload=()=>{const img=new Image();
     img.onload=()=>{
       apiImageType="image/jpeg";
-      apiImageB64=resize(img,1024,0.8).split(",")[1];
-      pendingPhoto=resize(img,360,0.6);
-      document.getElementById("previewImg").src=pendingPhoto;
+      apiImageB64=resize(img,1024,0.8).split(",")[1];  // 发给 AI 识别
+      fullPhoto=resize(img,1280,0.82);                 // 存 Storage 的清晰图
+      pendingPhoto=resize(img,360,0.6);                // 本地预览/离线/未登录回退
+      document.getElementById("previewImg").src=fullPhoto;
       document.getElementById("photoPreview").style.display="block";
     }; img.src=r.result;};
   r.readAsDataURL(file);
@@ -737,8 +753,9 @@ function showResult(r){
   document.getElementById("rEdit").addEventListener("input",e=>{document.getElementById("rTotal").textContent=e.target.value||0;});
   document.getElementById("saveMealBtn").style.display="block";
 }
-document.getElementById("saveMealBtn").onclick=()=>{
+document.getElementById("saveMealBtn").onclick=async()=>{
   if(!lastResult)return;
+  const btn=document.getElementById("saveMealBtn"); btn.disabled=true;
   const text=document.getElementById("mealText").value.trim();
   const total=Math.round(+document.getElementById("rEdit").value||lastResult.total||0);
   const now=new Date();
@@ -746,10 +763,20 @@ document.getElementById("saveMealBtn").onclick=()=>{
     time:`${pad(now.getHours())}:${pad(now.getMinutes())}`,
     text:text||(lastResult.items[0]&&lastResult.items[0].name)||"一餐",
     items:lastResult.items, note:lastResult.note||"", calories:total,
-    photo:pendingPhoto||null, updated_at:now.toISOString() };
+    photo:null, updated_at:now.toISOString() };
+  if(fullPhoto){
+    if(sb&&sbUser){
+      btn.innerHTML='<span class="spin"></span>上传照片…';
+      const url=await uploadPhoto(meal.id,fullPhoto);
+      meal.photo = url || pendingPhoto;   // 上传失败则回退本地缩略图
+    }else{
+      meal.photo = pendingPhoto;          // 未登录：仅本地缩略图
+    }
+  }
   (data[selDate]=data[selDate]||[]).push(meal);
   saveData();
   enqueue({type:"upsert",meal}); flushQueue();
+  btn.disabled=false; btn.innerHTML="保存这一餐";
   closeModal(document.getElementById("addModal"));
   renderAll(); updateSyncStatus();
 };
