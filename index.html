@@ -230,11 +230,13 @@
 
     <div class="sec-title">② 云同步（可选，跨设备 / 防丢）</div>
     <div class="cloud-status off" id="cloudStatus">未配置云同步，数据仅存在本机。</div>
-    <label>Supabase 项目 URL</label>
-    <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off">
-    <label>Supabase anon key（公开密钥）</label>
-    <input type="password" id="sbKey" placeholder="eyJ...">
-    <button class="btn ghost sm" id="saveCloudCfg">保存云配置</button>
+    <div id="sbCfgArea">
+      <label>Supabase 项目 URL</label>
+      <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off">
+      <label>Supabase anon key（公开密钥）</label>
+      <input type="password" id="sbKey" placeholder="eyJ...">
+      <button class="btn ghost sm" id="saveCloudCfg">保存云配置</button>
+    </div>
 
     <div id="authArea" style="display:none">
       <label>邮箱</label>
@@ -280,6 +282,14 @@
 
 <script>
 "use strict";
+/* ========== 内置云配置（填一次，所有设备免输）==========
+   把你的 Supabase Project URL 和 anon key 填进下面两行引号里，
+   然后重新部署。anon key 是可公开的，放这里是安全的。
+   填了之后：手机打开网址只需登录账号密码，无需再输任何配置。 */
+const BAKED_SB_URL  = "https://bmikrpbuzdufbqtiuzzr.supabase.co";
+const BAKED_SB_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtaWtycGJ1emR1ZmJxdGl1enpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NTY3ODMsImV4cCI6MjA5NzEzMjc4M30.QzrMl0BrKYSEZsp6ZoHC1mW6cB1J83JgMXXbcwcYHqQ";   // anon public key
+/* ==================================================== */
+
 /* ===================== 存储 ===================== */
 const SKEY="calcal_settings", DKEY="calcal_data", QKEY="calcal_queue";
 let settings = JSON.parse(localStorage.getItem(SKEY)||"null") ||
@@ -313,10 +323,14 @@ const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",
 
 /* ===================== Supabase 云同步 ===================== */
 let sb=null, sbUser=null, syncing=false;
+const effSbUrl=()=>(BAKED_SB_URL||settings.sbUrl||"").trim().replace(/\/+$/,"");
+const effSbKey=()=>(BAKED_SB_KEY||settings.sbKey||"").trim();
+const sbBaked=()=> !!(BAKED_SB_URL && BAKED_SB_KEY);
 function initSupabase(){
   sb=null;
-  if(settings.sbUrl && settings.sbKey && window.supabase){
-    try{ sb=window.supabase.createClient(settings.sbUrl,settings.sbKey,{auth:{persistSession:true}}); }
+  const u=effSbUrl(), k=effSbKey();
+  if(u && k && window.supabase){
+    try{ sb=window.supabase.createClient(u,k,{auth:{persistSession:true}}); }
     catch(e){ console.warn("Supabase 初始化失败",e); }
   }
 }
@@ -355,10 +369,33 @@ async function pullCloud(){
   for(const d in map) map[d].sort((a,b)=>(a.time||"").localeCompare(b.time||""));
   data=map; saveData();
 }
+async function pullConfig(){
+  if(!sb||!sbUser) return;
+  try{
+    const {data:row,error}=await sb.from("user_config").select("*").eq("user_id",sbUser.id).maybeSingle();
+    if(error){ console.warn("配置拉取失败",error); return; }
+    if(row){
+      if(row.api_key) settings.apiKey=row.api_key;
+      if(row.model)   settings.model=row.model;
+      if(row.goal)    settings.goal=row.goal;
+      saveSettings();
+    }else if(settings.apiKey){
+      await pushConfig();   // 首次登录：把本机已有的 Key 存上云，别的设备就能拉到
+    }
+  }catch(e){ console.warn(e); }
+}
+async function pushConfig(){
+  if(!sb||!sbUser) return;
+  try{
+    await sb.from("user_config").upsert({
+      user_id:sbUser.id, api_key:settings.apiKey||null,
+      model:settings.model, goal:settings.goal, updated_at:new Date().toISOString()});
+  }catch(e){ console.warn("配置上传失败",e); }
+}
 async function syncAll(){
   if(!sb||!sbUser||syncing) return;
   syncing=true; updateSyncStatus(true);
-  try{ await flushQueue(); await pullCloud(); renderAll(); }
+  try{ await flushQueue(); await pullCloud(); await pullConfig(); renderAll(); }
   finally{ syncing=false; updateSyncStatus(); }
 }
 function updateSyncStatus(spin){
@@ -529,6 +566,7 @@ function openSettingsForm(){
   const r=document.querySelector(`input[name=model][value="${settings.model}"]`);
   (r||document.querySelector('input[name=model][value="claude-haiku-4-5"]')).checked=true;
   document.getElementById("authArea").style.display = sb?"block":"none";
+  document.getElementById("sbCfgArea").style.display = sbBaked()?"none":"block";
   updateSyncStatus();
   openModal("settingsModal");
 }
@@ -540,7 +578,9 @@ document.getElementById("saveSettings").onclick=()=>{
   settings.goal=+document.getElementById("goal").value||1500;
   const m=document.querySelector("input[name=model]:checked");
   settings.model=m?m.value:"claude-haiku-4-5";
-  saveSettings(); renderAll(); flash("已保存");
+  saveSettings(); renderAll();
+  if(sb&&sbUser){ pushConfig(); flash("已保存（已同步到账号）"); }
+  else flash("已保存");
 };
 document.getElementById("saveCloudCfg").onclick=async()=>{
   settings.sbUrl=document.getElementById("sbUrl").value.trim().replace(/\/+$/,"");
