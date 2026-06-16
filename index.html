@@ -392,16 +392,16 @@ async function pushConfig(){
       model:settings.model, goal:settings.goal, updated_at:new Date().toISOString()});
   }catch(e){ console.warn("配置上传失败",e); }
 }
-/* 照片上传到 Storage（清晰原图），返回公开链接 */
+/* 照片上传到 Storage（清晰原图）。返回 {url} 或 {error} */
 async function uploadPhoto(id,dataUrl){
-  if(!sb||!sbUser) return null;
+  if(!sb||!sbUser) return {error:"未登录"};
   try{
     const blob=await (await fetch(dataUrl)).blob();
     const path=`${sbUser.id}/${id}.jpg`;
     const {error}=await sb.storage.from("photos").upload(path,blob,{contentType:"image/jpeg",upsert:true});
-    if(error){ console.warn("照片上传失败",error); return null; }
-    return sb.storage.from("photos").getPublicUrl(path).data.publicUrl;
-  }catch(e){ console.warn(e); return null; }
+    if(error){ console.warn("照片上传失败",error); return {error:error.message||String(error)}; }
+    return {url: sb.storage.from("photos").getPublicUrl(path).data.publicUrl};
+  }catch(e){ console.warn(e); return {error:e.message||String(e)}; }
 }
 async function removePhoto(id){
   if(!sb||!sbUser) return;
@@ -767,10 +767,12 @@ document.getElementById("saveMealBtn").onclick=async()=>{
   if(fullPhoto){
     if(sb&&sbUser){
       btn.innerHTML='<span class="spin"></span>上传照片…';
-      const url=await uploadPhoto(meal.id,fullPhoto);
-      meal.photo = url || pendingPhoto;   // 上传失败则回退本地缩略图
+      const r=await uploadPhoto(meal.id,fullPhoto);
+      if(r.url){ meal.photo=r.url; }
+      else{ meal.photo=pendingPhoto; flash("照片没传上云："+r.error+"，先存了本地小图"); }
     }else{
       meal.photo = pendingPhoto;          // 未登录：仅本地缩略图
+      flash("未登录，照片只存了本地小图；登录后再记就会清晰上云");
     }
   }
   (data[selDate]=data[selDate]||[]).push(meal);
