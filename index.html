@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>减脂卡路里</title>
+
+<!-- PWA / iPhone 添加到主屏幕 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="卡路里">
+<meta name="theme-color" content="#16a34a">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' rx='40' fill='%2316a34a'/%3E%3Ctext x='50%25' y='54%25' font-size='110' text-anchor='middle' dominant-baseline='middle'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext x='0' y='52' font-size='52'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href='data:application/manifest+json,{"name":"减脂卡路里","short_name":"卡路里","start_url":".","display":"standalone","background_color":"%23f7f7f4","theme_color":"%2316a34a"}'>
+
+<style>
+  :root{
+    --green:#16a34a; --green-d:#15803d; --bg:#f7f7f4; --card:#ffffff;
+    --ink:#1c2420; --muted:#7c857f; --line:#e8e8e2; --over:#dc2626; --warn:#d97706;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink);
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 90px) env(safe-area-inset-left);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:14px;}
+  header{display:flex;align-items:center;justify-content:space-between;margin:6px 2px 14px;}
+  header h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.5px;}
+  .hbtns{display:flex;align-items:center;gap:6px;}
+  .sync-badge{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:4px 10px;cursor:pointer;white-space:nowrap;}
+  .gear{background:none;border:none;font-size:22px;cursor:pointer;padding:6px;line-height:1;}
+
+  .summary{background:var(--card);border-radius:18px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;}
+  .summary .day{font-size:13px;color:var(--muted);margin-bottom:6px;}
+  .summary .big{display:flex;align-items:baseline;gap:8px;}
+  .summary .kcal{font-size:38px;font-weight:800;line-height:1;}
+  .summary .goal{font-size:14px;color:var(--muted);}
+  .bar{height:9px;background:var(--line);border-radius:9px;margin-top:14px;overflow:hidden;}
+  .bar > div{height:100%;background:var(--green);border-radius:9px;transition:width .35s ease,background .2s;}
+  .remain{font-size:13px;color:var(--muted);margin-top:8px;}
+
+  .cal{background:var(--card);border-radius:18px;padding:14px;box-shadow:var(--shadow);margin-bottom:14px;}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .cal-head button{background:none;border:none;font-size:20px;color:var(--green);cursor:pointer;padding:4px 10px;border-radius:8px;}
+  .cal-head .mlabel{font-weight:700;font-size:15px;}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .grid .wd{text-align:center;font-size:11px;color:var(--muted);padding:4px 0;}
+  .cell{aspect-ratio:1;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:2px solid transparent;position:relative;}
+  .cell .dnum{font-size:14px;font-weight:600;}
+  .cell .ckcal{font-size:9px;color:var(--muted);margin-top:1px;line-height:1;}
+  .cell.has{background:#f0f7f2;}
+  .cell.over{background:#fdecec;}
+  .cell.over .ckcal{color:var(--over);}
+  .cell.sel{border-color:var(--green);}
+  .cell.today .dnum{color:var(--green);}
+  .cell.empty{cursor:default;}
+
+  .meals-head{display:flex;align-items:center;justify-content:space-between;margin:4px 4px 10px;}
+  .meals-head h2{font-size:15px;margin:0;font-weight:700;}
+  .meals-head .mt{font-size:13px;color:var(--muted);}
+  .meal{background:var(--card);border-radius:16px;padding:13px 14px;box-shadow:var(--shadow);margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;cursor:pointer;}
+  .meal:active{background:#fafaf8;}
+  .meal img{width:54px;height:54px;border-radius:12px;object-fit:cover;flex-shrink:0;background:var(--line);}
+  .meal .body{flex:1;min-width:0;}
+  .meal .mtitle{font-weight:600;font-size:15px;word-break:break-word;}
+  .meal .mitems{font-size:12px;color:var(--muted);margin-top:3px;word-break:break-word;}
+  .meal .mtime{font-size:11px;color:var(--muted);margin-top:4px;}
+  .meal .mk{font-weight:800;font-size:17px;white-space:nowrap;}
+  .meal .mk small{font-size:11px;font-weight:500;color:var(--muted);}
+  .meal .del{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 2px;align-self:center;}
+  .empty-tip{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
+
+  .fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 20px);
+    background:var(--green);color:#fff;border:none;border-radius:30px;padding:15px 28px;font-size:16px;font-weight:700;
+    box-shadow:0 6px 18px rgba(22,163,74,.4);cursor:pointer;z-index:50;display:flex;align-items:center;gap:8px;}
+  .fab:active{transform:translateX(-50%) scale(.96);}
+
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;justify-content:center;z-index:100;}
+  .modal.show{display:flex;}
+  .sheet{background:var(--bg);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 18px);max-height:92vh;overflow-y:auto;animation:up .25s ease;}
+  @keyframes up{from{transform:translateY(40px);opacity:.5;}to{transform:translateY(0);opacity:1;}}
+  .sheet h3{margin:2px 0 16px;font-size:18px;display:flex;justify-content:space-between;align-items:center;}
+  .sheet h3 .x{font-size:24px;color:var(--muted);cursor:pointer;border:none;background:none;}
+  .sec-title{font-size:13px;font-weight:700;color:var(--green-d);margin:24px 2px 4px;border-top:1px solid var(--line);padding-top:18px;}
+  .sec-title:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 2px 6px;}
+  textarea,input[type=text],input[type=password],input[type=email],input[type=number],select{
+    width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px;font-size:15px;font-family:inherit;background:var(--card);color:var(--ink);}
+  textarea{min-height:70px;resize:vertical;}
+  .photo-row{display:flex;gap:10px;margin-top:10px;}
+  .photo-btn{flex:1;border:1.5px dashed var(--line);background:var(--card);border-radius:12px;padding:14px;text-align:center;font-size:14px;color:var(--muted);cursor:pointer;}
+  #photoPreview{margin-top:10px;display:none;}
+  #photoPreview img{width:100%;max-height:240px;object-fit:contain;border-radius:12px;background:#000;}
+  .btn{width:100%;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px;}
+  .btn.primary{background:var(--green);color:#fff;}
+  .btn.primary:disabled{opacity:.5;}
+  .btn.ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--line);}
+  .btn.danger{background:none;color:var(--over);border:1.5px solid #f3c9c9;}
+  .btn.sm{padding:11px;font-size:14px;margin-top:10px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .hint a{color:var(--green);}
+  .cloud-status{font-size:13px;padding:10px 12px;border-radius:10px;background:#f0f7f2;color:var(--green-d);margin-top:10px;}
+  .cloud-status.off{background:#f4f4f1;color:var(--muted);}
+  .result{background:var(--card);border-radius:14px;padding:14px;margin-top:14px;border:1.5px solid #d7ecdd;}
+  .result .rtotal{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
+  .result .rtotal b{font-size:30px;color:var(--green);}
+  .result .rline{font-size:13px;display:flex;justify-content:space-between;padding:4px 0;border-top:1px dashed var(--line);}
+  .result .rnote{font-size:12px;color:var(--muted);margin-top:8px;}
+  .editk{width:90px !important;display:inline-block;padding:6px 8px !important;text-align:center;}
+  .spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:-3px;margin-right:6px;}
+  @keyframes rot{to{transform:rotate(360deg);}}
+  .err{background:#fdecec;color:var(--over);border-radius:12px;padding:12px;font-size:13px;margin-top:12px;line-height:1.5;display:none;}
+  .seg{display:flex;gap:8px;}
+  .seg label{flex:1;margin:0;}
+  .seg input{display:none;}
+  .seg span{display:block;text-align:center;padding:11px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);font-size:13px;color:var(--ink);cursor:pointer;}
+  .seg input:checked + span{border-color:var(--green);background:#f0f7f2;color:var(--green-d);font-weight:600;}
+  .row2{display:flex;gap:10px;}
+  .row2 > *{flex:1;}
+
+  /* 餐次详情 + 图片放大 */
+  .detail-photo{width:100%;max-height:46vh;object-fit:contain;border-radius:14px;background:#000;cursor:zoom-in;}
+  .detail-cal{font-size:15px;color:var(--muted);margin-top:14px;}
+  .detail-cal b{font-size:34px;color:var(--green);font-weight:800;}
+  .detail-title{font-size:18px;font-weight:700;margin-top:8px;word-break:break-word;}
+  .detail-meta{font-size:13px;color:var(--muted);margin-top:4px;}
+  .detail-items{background:var(--card);border-radius:14px;padding:4px 14px;margin-top:14px;}
+  .ditem{display:flex;justify-content:space-between;font-size:14px;padding:10px 0;border-top:1px dashed var(--line);}
+  .ditem:first-child{border-top:none;}
+  .detail-note{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.5;background:#f0f7f2;padding:10px 12px;border-radius:10px;}
+  .detail-actions{display:flex;gap:10px;margin-top:18px;}
+  .detail-actions button{flex:1;margin-top:0;}
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.93);display:none;align-items:center;justify-content:center;z-index:200;padding:8px;cursor:zoom-out;}
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;object-fit:contain;}
+  .lightbox .lb-close{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:16px;color:#fff;font-size:30px;background:none;border:none;}
+</style>
+
+<!-- Supabase 客户端（云同步用；离线/未配置时 App 仍可本地运行） -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔥 减脂卡路里</h1>
+    <div class="hbtns">
+      <span class="sync-badge" id="syncBadge">☁️ 本地</span>
+      <button class="gear" id="openSettings" title="设置">⚙️</button>
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="day" id="sumDay">今天</div>
+    <div class="big">
+      <span class="kcal" id="sumKcal">0</span>
+      <span class="goal" id="sumGoal">/ 1500 千卡</span>
+    </div>
+    <div class="bar"><div id="sumBar" style="width:0%"></div></div>
+    <div class="remain" id="sumRemain"></div>
+  </div>
+
+  <div class="cal">
+    <div class="cal-head">
+      <button id="prevM">‹</button>
+      <div class="mlabel" id="mLabel"></div>
+      <button id="nextM">›</button>
+    </div>
+    <div class="grid" id="weekdays"></div>
+    <div class="grid" id="calGrid"></div>
+  </div>
+
+  <div class="meals-head">
+    <h2 id="mealsTitle">今日记录</h2>
+    <span class="mt" id="mealsCount"></span>
+  </div>
+  <div id="mealsList"></div>
+</div>
+
+<button class="fab" id="addBtn">＋ 记一餐</button>
+
+<!-- 添加餐次 -->
+<div class="modal" id="addModal">
+  <div class="sheet">
+    <h3>记录一餐 <button class="x" data-close>×</button></h3>
+    <label>文字描述（吃了什么、大概多少）</label>
+    <textarea id="mealText" placeholder="例：一碗牛肉面 + 一个鸡蛋 + 半杯豆浆"></textarea>
+    <div class="photo-row">
+      <label class="photo-btn" style="margin:0">
+        📷 拍照
+        <input type="file" accept="image/*" capture="environment" id="camInput" hidden>
+      </label>
+      <label class="photo-btn" style="margin:0">
+        🖼️ 相册
+        <input type="file" accept="image/*" id="fileInput" hidden>
+      </label>
+    </div>
+    <div id="photoPreview"><img id="previewImg" alt=""></div>
+
+    <button class="btn primary" id="estimateBtn">让 AI 估算卡路里</button>
+    <div class="err" id="addErr"></div>
+
+    <div class="result" id="resultBox" style="display:none"></div>
+    <button class="btn primary" id="saveMealBtn" style="display:none">保存这一餐</button>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="modal" id="settingsModal">
+  <div class="sheet">
+    <h3>设置 <button class="x" data-close>×</button></h3>
+
+    <div class="sec-title">① AI 识别</div>
+    <label>Claude API Key（仅保存在本机）</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-...">
+    <div class="hint">在 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 创建。</div>
+    <label>识别模型</label>
+    <div class="seg" id="modelSeg">
+      <label><input type="radio" name="model" value="claude-haiku-4-5"><span>Haiku<br>最省钱</span></label>
+      <label><input type="radio" name="model" value="claude-sonnet-4-6"><span>Sonnet<br>均衡</span></label>
+      <label><input type="radio" name="model" value="claude-opus-4-8"><span>Opus<br>最准</span></label>
+    </div>
+    <label>每日卡路里目标</label>
+    <input type="number" id="goal" placeholder="1500">
+    <button class="btn primary sm" id="saveSettings">保存以上设置</button>
+
+    <div class="sec-title">② 云同步（可选，跨设备 / 防丢）</div>
+    <div class="cloud-status off" id="cloudStatus">未配置云同步，数据仅存在本机。</div>
+    <label>Supabase 项目 URL</label>
+    <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off">
+    <label>Supabase anon key（公开密钥）</label>
+    <input type="password" id="sbKey" placeholder="eyJ...">
+    <button class="btn ghost sm" id="saveCloudCfg">保存云配置</button>
+
+    <div id="authArea" style="display:none">
+      <label>邮箱</label>
+      <input type="email" id="email" placeholder="you@example.com" autocapitalize="off" autocorrect="off">
+      <label>密码</label>
+      <input type="password" id="password" placeholder="至少 6 位">
+      <div class="row2">
+        <button class="btn primary sm" id="loginBtn">登录</button>
+        <button class="btn ghost sm" id="signupBtn">注册</button>
+      </div>
+      <button class="btn ghost sm" id="logoutBtn" style="display:none">退出登录</button>
+      <button class="btn ghost sm" id="syncNowBtn" style="display:none">立即同步</button>
+    </div>
+    <div class="hint">第一次用需要在 Supabase 后台建一张表（一段 SQL，复制粘贴即可）。配置方法我已经给你写好步骤。</div>
+
+    <div class="sec-title">③ 本地备份</div>
+    <div class="row2">
+      <button class="btn ghost sm" id="exportBtn" style="margin:0">导出 JSON</button>
+      <label class="btn ghost sm" style="margin:0;text-align:center">导入 JSON<input type="file" accept="application/json" id="importInput" hidden></label>
+    </div>
+    <button class="btn danger sm" id="clearBtn">清空本机数据</button>
+    <div class="hint">「清空本机」只清这台手机的缓存；若已登录云同步，云端数据不受影响，下次会重新拉回来。</div>
+  </div>
+</div>
+
+<!-- 餐次详情 -->
+<div class="modal" id="detailModal">
+  <div class="sheet">
+    <h3>这一餐 <button class="x" data-close>×</button></h3>
+    <div id="detailBody"></div>
+    <div class="detail-actions">
+      <button class="btn ghost" id="detailEdit">改卡路里</button>
+      <button class="btn danger" id="detailDel">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 图片全屏放大 -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close">×</button>
+  <img id="lightboxImg" alt="">
+</div>
+
+<script>
+"use strict";
+/* ===================== 存储 ===================== */
+const SKEY="calcal_settings", DKEY="calcal_data", QKEY="calcal_queue";
+let settings = JSON.parse(localStorage.getItem(SKEY)||"null") ||
+  {apiKey:"",model:"claude-haiku-4-5",goal:1500,sbUrl:"",sbKey:""};
+let data  = JSON.parse(localStorage.getItem(DKEY)||"{}");   // { "YYYY-MM-DD":[meal,...] }
+let queue = JSON.parse(localStorage.getItem(QKEY)||"[]");   // 待同步操作
+
+const saveSettings=()=>localStorage.setItem(SKEY,JSON.stringify(settings));
+const saveQueue=()=>localStorage.setItem(QKEY,JSON.stringify(queue));
+function saveData(){
+  try{ localStorage.setItem(DKEY,JSON.stringify(data)); }
+  catch(e){ // 本地缓存满：存一份去掉照片的精简版（云端仍保留照片）
+    try{
+      const slim={};
+      for(const d in data) slim[d]=data[d].map(m=>Object.assign({},m,{photo:null}));
+      localStorage.setItem(DKEY,JSON.stringify(slim));
+    }catch(_){ console.warn("本地缓存已满"); }
+  }
+}
+const genId=()=> (crypto.randomUUID? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2));
+
+/* ===================== 日期工具 ===================== */
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const todayStr=ymd(new Date());
+let selDate=todayStr;
+let viewYear,viewMonth;
+{const t=new Date();viewYear=t.getFullYear();viewMonth=t.getMonth();}
+const dayTotal=ds=>(data[ds]||[]).reduce((s,m)=>s+(+m.calories||0),0);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ===================== Supabase 云同步 ===================== */
+let sb=null, sbUser=null, syncing=false;
+function initSupabase(){
+  sb=null;
+  if(settings.sbUrl && settings.sbKey && window.supabase){
+    try{ sb=window.supabase.createClient(settings.sbUrl,settings.sbKey,{auth:{persistSession:true}}); }
+    catch(e){ console.warn("Supabase 初始化失败",e); }
+  }
+}
+function enqueue(op){ queue.push(op); saveQueue(); }
+function rowFromMeal(m){
+  return {id:m.id,user_id:sbUser.id,date:m.date,time:m.time,text:m.text,
+          items:m.items||[],note:m.note||"",calories:m.calories,photo:m.photo||null,
+          updated_at:m.updated_at||new Date().toISOString()};
+}
+async function flushQueue(){
+  if(!sb||!sbUser||!queue.length) return;
+  const pending=queue.slice();
+  for(const op of pending){
+    try{
+      if(op.type==="upsert"){
+        const {error}=await sb.from("meals").upsert(rowFromMeal(op.meal));
+        if(error) throw error;
+      }else if(op.type==="delete"){
+        const {error}=await sb.from("meals").delete().eq("id",op.id);
+        if(error) throw error;
+      }
+      queue=queue.filter(q=>q!==op); saveQueue();
+    }catch(e){ console.warn("同步失败，稍后重试",e); break; }
+  }
+}
+async function pullCloud(){
+  if(!sb||!sbUser) return;
+  const {data:rows,error}=await sb.from("meals").select("*");
+  if(error){ console.warn("拉取失败",error); return; }
+  const map={};
+  for(const r of rows){
+    (map[r.date]=map[r.date]||[]).push({
+      id:r.id,date:r.date,time:r.time,text:r.text,items:r.items||[],
+      note:r.note,calories:r.calories,photo:r.photo,updated_at:r.updated_at});
+  }
+  for(const d in map) map[d].sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+  data=map; saveData();
+}
+async function syncAll(){
+  if(!sb||!sbUser||syncing) return;
+  syncing=true; updateSyncStatus(true);
+  try{ await flushQueue(); await pullCloud(); renderAll(); }
+  finally{ syncing=false; updateSyncStatus(); }
+}
+function updateSyncStatus(spin){
+  const badge=document.getElementById("syncBadge");
+  const cs=document.getElementById("cloudStatus");
+  if(!sb){ badge.textContent="☁️ 本地"; cs.className="cloud-status off"; cs.textContent="未配置云同步，数据仅存在本机。"; }
+  else if(!sbUser){ badge.textContent="☁️ 未登录"; cs.className="cloud-status off"; cs.textContent="已配置，但还没登录。请在下方登录/注册后开始同步。"; }
+  else{
+    const n=queue.length;
+    badge.textContent = spin? "⏳ 同步中" : (n? `⏳ ${n} 待同步` : "✅ 已同步");
+    cs.className="cloud-status";
+    cs.textContent = `已登录：${sbUser.email||"账号"}` + (n? `（${n} 条待上传）`:"（数据实时同步到云端）");
+  }
+  // 登录区显隐
+  const logged=!!sbUser;
+  document.getElementById("logoutBtn").style.display = logged?"block":"none";
+  document.getElementById("syncNowBtn").style.display = logged?"block":"none";
+  document.getElementById("loginBtn").style.display = logged?"none":"block";
+  document.getElementById("signupBtn").style.display = logged?"none":"block";
+}
+async function initCloud(){
+  initSupabase();
+  if(!sb){ updateSyncStatus(); return; }
+  document.getElementById("authArea").style.display="block";
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(session){ sbUser=session.user; await syncAll(); }
+    sb.auth.onAuthStateChange((_e,s)=>{ sbUser=s?s.user:null; updateSyncStatus(); if(sbUser) syncAll(); });
+  }catch(e){ console.warn(e); }
+  updateSyncStatus();
+}
+
+/* ===================== 渲染 ===================== */
+function renderSummary(){
+  const total=dayTotal(selDate), goal=+settings.goal||1500;
+  document.getElementById("sumKcal").textContent=total;
+  document.getElementById("sumGoal").textContent="/ "+goal+" 千卡";
+  const pct=Math.min(100,goal?total/goal*100:0);
+  const bar=document.getElementById("sumBar");
+  bar.style.width=pct+"%";
+  bar.style.background = total>goal ? "var(--over)" : (pct>85?"var(--warn)":"var(--green)");
+  const remain=goal-total;
+  document.getElementById("sumRemain").textContent = remain>=0 ? `还可以吃 ${remain} 千卡` : `已超出 ${-remain} 千卡`;
+  let label;
+  if(selDate===todayStr) label="今天";
+  else{const[,m,d]=selDate.split("-");label=`${+m}月${+d}日`;}
+  document.getElementById("sumDay").textContent=label;
+  document.getElementById("mealsTitle").textContent=(selDate===todayStr?"今日":label)+"记录";
+}
+const WD=["日","一","二","三","四","五","六"];
+function renderWeekdays(){ document.getElementById("weekdays").innerHTML=WD.map(w=>`<div class="wd">${w}</div>`).join(""); }
+function renderCalendar(){
+  document.getElementById("mLabel").textContent=`${viewYear}年 ${viewMonth+1}月`;
+  const first=new Date(viewYear,viewMonth,1).getDay();
+  const days=new Date(viewYear,viewMonth+1,0).getDate();
+  const goal=+settings.goal||1500;
+  let html="";
+  for(let i=0;i<first;i++) html+=`<div class="cell empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const ds=`${viewYear}-${pad(viewMonth+1)}-${pad(d)}`;
+    const t=dayTotal(ds);
+    const cls=["cell"];
+    if(t>0) cls.push(t>goal?"over":"has");
+    if(ds===todayStr) cls.push("today");
+    if(ds===selDate) cls.push("sel");
+    html+=`<div class="${cls.join(" ")}" data-d="${ds}">
+      <span class="dnum">${d}</span>
+      <span class="ckcal">${t>0?t:"&nbsp;"}</span></div>`;
+  }
+  document.getElementById("calGrid").innerHTML=html;
+}
+function renderMeals(){
+  const list=data[selDate]||[];
+  document.getElementById("mealsCount").textContent=list.length?`共 ${list.length} 餐`:"";
+  const box=document.getElementById("mealsList");
+  if(!list.length){box.innerHTML=`<div class="empty-tip">这天还没有记录，点下面「＋ 记一餐」开始 👇</div>`;return;}
+  box.innerHTML=list.map(m=>`
+    <div class="meal" data-meal="${m.id}">
+      ${m.photo?`<img src="${m.photo}" alt="">`:""}
+      <div class="body">
+        <div class="mtitle">${esc(m.text||(m.items&&m.items[0]&&m.items[0].name)||"一餐")}</div>
+        ${m.items&&m.items.length?`<div class="mitems">${m.items.map(i=>esc(i.name)+" "+i.calories).join(" · ")}</div>`:""}
+        <div class="mtime">${m.time||""}</div>
+      </div>
+      <div class="mk">${m.calories}<small> 千卡</small></div>
+      <button class="del" data-del="${m.id}">🗑</button>
+    </div>`).join("");
+}
+function renderAll(){renderSummary();renderCalendar();renderMeals();}
+
+/* ===================== 交互 ===================== */
+document.getElementById("calGrid").addEventListener("click",e=>{
+  const cell=e.target.closest(".cell[data-d]"); if(!cell)return;
+  selDate=cell.dataset.d; renderAll();
+});
+document.getElementById("prevM").onclick=()=>{viewMonth--;if(viewMonth<0){viewMonth=11;viewYear--;}renderCalendar();};
+document.getElementById("nextM").onclick=()=>{viewMonth++;if(viewMonth>11){viewMonth=0;viewYear++;}renderCalendar();};
+
+document.getElementById("mealsList").addEventListener("click",e=>{
+  const del=e.target.closest("[data-del]");
+  if(del){ e.stopPropagation(); deleteMeal(del.dataset.del); return; }
+  const card=e.target.closest("[data-meal]");
+  if(card) openMealDetail(card.dataset.meal);
+});
+
+function findMeal(id){ return (data[selDate]||[]).find(x=>x.id===id); }
+function deleteMeal(id){
+  if(!confirm("删除这一餐？"))return;
+  data[selDate]=(data[selDate]||[]).filter(m=>m.id!==id);
+  if(!data[selDate].length) delete data[selDate];
+  saveData(); enqueue({type:"delete",id}); flushQueue();
+  renderAll(); updateSyncStatus();
+}
+function editMealCalories(id){
+  const m=findMeal(id); if(!m)return false;
+  const v=prompt("修改这一餐的卡路里：",m.calories);
+  if(v===null||isNaN(+v))return false;
+  m.calories=Math.round(+v); m.updated_at=new Date().toISOString();
+  saveData(); enqueue({type:"upsert",meal:m}); flushQueue();
+  renderAll(); updateSyncStatus(); return true;
+}
+
+/* ----- 餐次详情 ----- */
+let detailId=null;
+function openMealDetail(id){
+  const m=findMeal(id); if(!m)return;
+  detailId=id;
+  const [,mo,d]=(m.date||selDate).split("-");
+  document.getElementById("detailBody").innerHTML=`
+    ${m.photo?`<img class="detail-photo" id="detailPhoto" src="${m.photo}" alt="点击放大">`:""}
+    <div class="detail-cal"><b>${m.calories}</b> 千卡</div>
+    <div class="detail-title">${esc(m.text||"一餐")}</div>
+    <div class="detail-meta">${+mo}月${+d}日 ${m.time||""}${m.photo?" · 点图片可放大":""}</div>
+    ${m.items&&m.items.length?`<div class="detail-items">${m.items.map(i=>`<div class="ditem"><span>${esc(i.name)}</span><span>${i.calories} 千卡</span></div>`).join("")}</div>`:""}
+    ${m.note?`<div class="detail-note">💡 ${esc(m.note)}</div>`:""}`;
+  if(m.photo) document.getElementById("detailPhoto").onclick=()=>openLightbox(m.photo);
+  openModal("detailModal");
+}
+document.getElementById("detailEdit").onclick=()=>{ if(editMealCalories(detailId)) openMealDetail(detailId); };
+document.getElementById("detailDel").onclick=()=>{
+  const id=detailId;
+  if(!confirm("删除这一餐？"))return;
+  data[selDate]=(data[selDate]||[]).filter(m=>m.id!==id);
+  if(!data[selDate].length) delete data[selDate];
+  saveData(); enqueue({type:"delete",id}); flushQueue();
+  closeModal(document.getElementById("detailModal"));
+  renderAll(); updateSyncStatus();
+};
+
+/* ----- 图片全屏放大 ----- */
+function openLightbox(src){
+  document.getElementById("lightboxImg").src=src;
+  document.getElementById("lightbox").classList.add("show");
+}
+document.getElementById("lightbox").onclick=()=>document.getElementById("lightbox").classList.remove("show");
+
+function openModal(id){document.getElementById(id).classList.add("show");}
+function closeModal(el){el.classList.remove("show");}
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=e=>closeModal(e.target.closest(".modal")));
+document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)closeModal(m);}));
+
+/* ===================== 设置 ===================== */
+function openSettingsForm(){
+  document.getElementById("apiKey").value=settings.apiKey||"";
+  document.getElementById("goal").value=settings.goal||1500;
+  document.getElementById("sbUrl").value=settings.sbUrl||"";
+  document.getElementById("sbKey").value=settings.sbKey||"";
+  const r=document.querySelector(`input[name=model][value="${settings.model}"]`);
+  (r||document.querySelector('input[name=model][value="claude-haiku-4-5"]')).checked=true;
+  document.getElementById("authArea").style.display = sb?"block":"none";
+  updateSyncStatus();
+  openModal("settingsModal");
+}
+document.getElementById("openSettings").onclick=openSettingsForm;
+document.getElementById("syncBadge").onclick=openSettingsForm;
+
+document.getElementById("saveSettings").onclick=()=>{
+  settings.apiKey=document.getElementById("apiKey").value.trim();
+  settings.goal=+document.getElementById("goal").value||1500;
+  const m=document.querySelector("input[name=model]:checked");
+  settings.model=m?m.value:"claude-haiku-4-5";
+  saveSettings(); renderAll(); flash("已保存");
+};
+document.getElementById("saveCloudCfg").onclick=async()=>{
+  settings.sbUrl=document.getElementById("sbUrl").value.trim().replace(/\/+$/,"");
+  settings.sbKey=document.getElementById("sbKey").value.trim();
+  saveSettings();
+  await initCloud();
+  flash(sb?"云配置已保存，请登录":"已清除云配置");
+};
+document.getElementById("loginBtn").onclick=()=>doAuth("login");
+document.getElementById("signupBtn").onclick=()=>doAuth("signup");
+document.getElementById("logoutBtn").onclick=async()=>{
+  if(sb) await sb.auth.signOut(); sbUser=null; updateSyncStatus(); flash("已退出");
+};
+document.getElementById("syncNowBtn").onclick=()=>syncAll();
+async function doAuth(mode){
+  if(!sb){alert("请先填写并保存 Supabase URL 和 anon key");return;}
+  const email=document.getElementById("email").value.trim();
+  const password=document.getElementById("password").value;
+  if(!email||password.length<6){alert("请输入邮箱和至少 6 位的密码");return;}
+  const res = mode==="signup"
+    ? await sb.auth.signUp({email,password})
+    : await sb.auth.signInWithPassword({email,password});
+  if(res.error){alert((mode==="signup"?"注册":"登录")+"失败："+res.error.message);return;}
+  if(res.data.session){
+    sbUser=res.data.session.user; updateSyncStatus(); await syncAll(); flash("登录成功，已同步");
+  }else{
+    alert("注册成功！请去邮箱点确认链接后再登录。\n（嫌麻烦可在 Supabase 后台 Authentication 里关掉「Confirm email」，注册即登录）");
+  }
+}
+
+/* 备份 */
+document.getElementById("exportBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify({settings,data},null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`卡路里备份_${todayStr}.json`; a.click();
+};
+document.getElementById("importInput").onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=async()=>{try{
+    const o=JSON.parse(r.result);
+    if(o.data) data=o.data;
+    if(o.settings) settings=Object.assign(settings,o.settings);
+    saveData(); saveSettings();
+    // 已登录则把导入的数据推上云
+    if(sb&&sbUser){ for(const d in data) for(const m of data[d]){ m.date=m.date||d; enqueue({type:"upsert",meal:m}); } await syncAll(); }
+    renderAll(); updateSyncStatus(); alert("导入成功！");
+  }catch(err){alert("文件格式不对："+err.message);}};
+  r.readAsText(f);
+};
+document.getElementById("clearBtn").onclick=()=>{
+  if(confirm("清空这台手机的本地缓存？（云端数据不受影响）")){
+    data={}; saveData();
+    if(sbUser) syncAll(); else renderAll();
+    flash("已清空本机");
+  }
+};
+let flashT;
+function flash(msg){
+  clearTimeout(flashT);
+  let el=document.getElementById("_flash");
+  if(!el){el=document.createElement("div");el.id="_flash";
+    el.style.cssText="position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#1c2420;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;z-index:300;box-shadow:0 4px 14px rgba(0,0,0,.25);";
+    document.body.appendChild(el);}
+  el.textContent=msg; el.style.opacity="1";
+  flashT=setTimeout(()=>el.style.opacity="0",1600);
+}
+
+/* ===================== 添加一餐 ===================== */
+let pendingPhoto=null, apiImageB64=null, apiImageType=null, lastResult=null;
+document.getElementById("addBtn").onclick=()=>{resetAddForm();openModal("addModal");};
+function resetAddForm(){
+  document.getElementById("mealText").value="";
+  document.getElementById("photoPreview").style.display="none";
+  document.getElementById("resultBox").style.display="none";
+  document.getElementById("saveMealBtn").style.display="none";
+  document.getElementById("addErr").style.display="none";
+  const b=document.getElementById("estimateBtn"); b.disabled=false; b.textContent="让 AI 估算卡路里";
+  pendingPhoto=null;apiImageB64=null;apiImageType=null;lastResult=null;
+}
+function handleImage(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{const img=new Image();
+    img.onload=()=>{
+      apiImageType="image/jpeg";
+      apiImageB64=resize(img,1024,0.8).split(",")[1];
+      pendingPhoto=resize(img,360,0.6);
+      document.getElementById("previewImg").src=pendingPhoto;
+      document.getElementById("photoPreview").style.display="block";
+    }; img.src=r.result;};
+  r.readAsDataURL(file);
+}
+function resize(img,maxEdge,q){
+  let{width:w,height:h}=img;
+  const s=Math.min(1,maxEdge/Math.max(w,h)); w=Math.round(w*s); h=Math.round(h*s);
+  const c=document.createElement("canvas"); c.width=w;c.height=h;
+  c.getContext("2d").drawImage(img,0,0,w,h);
+  return c.toDataURL("image/jpeg",q);
+}
+document.getElementById("camInput").onchange=e=>handleImage(e.target.files[0]);
+document.getElementById("fileInput").onchange=e=>handleImage(e.target.files[0]);
+
+document.getElementById("estimateBtn").onclick=async()=>{
+  const text=document.getElementById("mealText").value.trim();
+  const err=document.getElementById("addErr"); err.style.display="none";
+  if(!settings.apiKey){err.textContent="还没填 API Key，点右上角 ⚙️ 设置里填一下。";err.style.display="block";return;}
+  if(!text&&!apiImageB64){err.textContent="请输入文字描述，或拍/选一张照片。";err.style.display="block";return;}
+  const btn=document.getElementById("estimateBtn");
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>正在识别…';
+  try{ lastResult=await estimateCalories(text,apiImageB64,apiImageType); showResult(lastResult); }
+  catch(e){ err.innerHTML="识别失败："+esc(e.message); err.style.display="block"; }
+  finally{ btn.disabled=false; btn.innerHTML="重新估算"; }
+};
+async function estimateCalories(text,imgB64,imgType){
+  const content=[];
+  if(imgB64) content.push({type:"image",source:{type:"base64",media_type:imgType,data:imgB64}});
+  content.push({type:"text",text:(text?`这一餐的描述：${text}\n`:"")+
+    (imgB64?"请根据图片":"请根据描述")+"识别食物并估算每种食物的卡路里（千卡）。无法确定份量时按常见单人份估计，给出合理数字。"});
+  const body={ model:settings.model, max_tokens:1024,
+    system:"你是专业的营养师助手，擅长根据食物的文字描述或照片估算卡路里。只输出结构化结果，单位为千卡(kcal)。估算贴近中国常见饮食的实际份量。",
+    messages:[{role:"user",content}],
+    output_config:{format:{type:"json_schema",schema:{
+      type:"object",
+      properties:{ items:{type:"array",items:{type:"object",
+          properties:{name:{type:"string"},calories:{type:"integer"}},
+          required:["name","calories"],additionalProperties:false}},
+        total:{type:"integer"}, note:{type:"string"} },
+      required:["items","total","note"],additionalProperties:false }}}
+  };
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"content-type":"application/json","x-api-key":settings.apiKey,
+      "anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify(body)});
+  if(!resp.ok){ let msg=`HTTP ${resp.status}`;
+    try{const j=await resp.json();if(j.error&&j.error.message)msg=j.error.message;}catch(_){}
+    if(resp.status===401)msg="API Key 无效，请检查设置。"; throw new Error(msg); }
+  const j=await resp.json();
+  const txt=(j.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+  let p; try{p=JSON.parse(txt);}catch(_){const m=txt.match(/\{[\s\S]*\}/);if(m)p=JSON.parse(m[0]);else throw new Error("返回结果无法解析");}
+  if(!p.items)p.items=[];
+  if(p.total==null)p.total=p.items.reduce((s,i)=>s+(+i.calories||0),0);
+  return p;
+}
+function showResult(r){
+  const box=document.getElementById("resultBox"); box.style.display="block";
+  box.innerHTML=`<div class="rtotal"><b id="rTotal">${r.total}</b><span>千卡（可手动改）</span>
+      <input type="number" class="editk" id="rEdit" value="${r.total}" style="margin-left:auto"></div>
+    ${r.items.map(i=>`<div class="rline"><span>${esc(i.name)}</span><span>${i.calories} 千卡</span></div>`).join("")}
+    ${r.note?`<div class="rnote">💡 ${esc(r.note)}</div>`:""}`;
+  document.getElementById("rEdit").addEventListener("input",e=>{document.getElementById("rTotal").textContent=e.target.value||0;});
+  document.getElementById("saveMealBtn").style.display="block";
+}
+document.getElementById("saveMealBtn").onclick=()=>{
+  if(!lastResult)return;
+  const text=document.getElementById("mealText").value.trim();
+  const total=Math.round(+document.getElementById("rEdit").value||lastResult.total||0);
+  const now=new Date();
+  const meal={ id:genId(), date:selDate,
+    time:`${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    text:text||(lastResult.items[0]&&lastResult.items[0].name)||"一餐",
+    items:lastResult.items, note:lastResult.note||"", calories:total,
+    photo:pendingPhoto||null, updated_at:now.toISOString() };
+  (data[selDate]=data[selDate]||[]).push(meal);
+  saveData();
+  enqueue({type:"upsert",meal}); flushQueue();
+  closeModal(document.getElementById("addModal"));
+  renderAll(); updateSyncStatus();
+};
+
+/* ===================== 启动 ===================== */
+renderWeekdays(); renderAll(); initCloud();
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && sbUser) syncAll(); });
+window.addEventListener("online",()=>{ if(sbUser) syncAll(); });
+if(!settings.apiKey){ setTimeout(openSettingsForm,400); }
+</script>
+</body>
+</html>
